@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -34,6 +35,7 @@ export default function UserProfile(props: UserProfileProps) {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<User>({
     defaultValues: userProfile,
@@ -42,6 +44,7 @@ export default function UserProfile(props: UserProfileProps) {
   const { user: currentUser, setUser, logout } = useAuth()
   const { showSnackBar } = useSnackBar()
   const [open, setOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     reset(userProfile)
@@ -49,14 +52,13 @@ export default function UserProfile(props: UserProfileProps) {
 
   const onSubmit: SubmitHandler<User> = async (data) => {
     let updatedUser: User
+    setIsSubmitting(true)
     try {
       if (currentUser?.uuid === userProfile.uuid) {
-        // Updating user profile.
         updatedUser = await userService.updateProfile(data)
         setUser(updatedUser)
         showSnackBar('User profile updated successfully.', 'success')
       } else {
-        // Updating user different from current user.
         updatedUser = await userService.updateUser(userProfile.uuid, data)
         showSnackBar('User profile updated successfully.', 'success')
       }
@@ -64,16 +66,29 @@ export default function UserProfile(props: UserProfileProps) {
         onUserUpdated(updatedUser)
       }
     } catch (error) {
-      let msg
       if (
         error instanceof AxiosError &&
         error.response &&
-        typeof error.response.data.detail == 'string'
-      )
-        msg = error.response.data.detail
-      else if (error instanceof Error) msg = error.message
-      else msg = String(error)
-      showSnackBar(msg, 'error')
+        error.response.status === 409 &&
+        typeof error.response.data.detail === 'string'
+      ) {
+        setError('email', {
+          type: 'manual',
+          message: '该邮箱已被使用',
+        })
+      } else if (
+        error instanceof AxiosError &&
+        error.response &&
+        typeof error.response.data.detail === 'string'
+      ) {
+        showSnackBar(error.response.data.detail, 'error')
+      } else if (error instanceof Error) {
+        showSnackBar(error.message, 'error')
+      } else {
+        showSnackBar(String(error), 'error')
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -150,7 +165,9 @@ export default function UserProfile(props: UserProfileProps) {
                   userProfile.provider !== ''
                 }
                 error={!!errors.email}
-                helperText={errors.email && 'Please provide an email address.'}
+                helperText={
+                  errors.email?.message || (errors.email && 'Please provide an email address.')
+                }
                 {...register('email', { required: true })}
               />
             </Grid>
@@ -215,8 +232,14 @@ export default function UserProfile(props: UserProfileProps) {
               </>
             )}
           </Grid>
-          <Button type='submit' fullWidth variant='contained' sx={{ mt: 3, mb: 2 }}>
-            Update
+          <Button
+            type='submit'
+            fullWidth
+            variant='contained'
+            sx={{ mt: 3, mb: 2 }}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <CircularProgress size={20} /> : 'Update'}
           </Button>
           {props.allowDelete && (
             <Button

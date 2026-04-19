@@ -1,8 +1,8 @@
-from typing import Any
+from typing import Any, List
 from uuid import UUID
 
 from beanie.exceptions import RevisionIdWasChanged
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic.networks import EmailStr
 from pymongo import errors
 
@@ -38,7 +38,8 @@ async def register_user(
         return user
     except errors.DuplicateKeyError:
         raise HTTPException(
-            status_code=400, detail="User with that email already exists."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with that email already exists.",
         )
 
 
@@ -85,7 +86,8 @@ async def update_profile(
         return current_user
     except (errors.DuplicateKeyError, RevisionIdWasChanged):
         raise HTTPException(
-            status_code=400, detail="User with that email already exists."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with that email already exists.",
         )
 
 
@@ -131,7 +133,8 @@ async def update_user(
         return updated_user
     except (errors.DuplicateKeyError, RevisionIdWasChanged):
         raise HTTPException(
-            status_code=400, detail="User with that email already exists."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with that email already exists.",
         )
 
 
@@ -169,3 +172,27 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     await user.delete()
     return user
+
+
+@router.post("/batch-delete", response_model=List[schemas.User])
+async def batch_delete_users(
+    user_ids: List[UUID] = Body(...),
+    admin_user: models.User = Depends(get_current_active_superuser),
+):
+    """
+    Batch delete multiple users.
+
+    ** Restricted to superuser **
+
+    Parameters
+    ----------
+    user_ids : List[UUID]
+        List of user UUIDs to delete
+    """
+    deleted_users: List[models.User] = []
+    for user_id in user_ids:
+        user = await models.User.find_one({"uuid": user_id})
+        if user is not None:
+            await user.delete()
+            deleted_users.append(user)
+    return deleted_users

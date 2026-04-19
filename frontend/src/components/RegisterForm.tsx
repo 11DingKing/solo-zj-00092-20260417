@@ -1,5 +1,5 @@
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
-import { Avatar, Box, Button, Collapse, Link, TextField, Typography } from '@mui/material'
+import { Avatar, Box, Button, CircularProgress, Collapse, Link, TextField, Typography } from '@mui/material'
 import Grid from '@mui/material/Grid'
 import { AxiosError } from 'axios'
 import { useState } from 'react'
@@ -16,32 +16,48 @@ export default function RegisterForm() {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<User>()
   const navigate = useNavigate()
   const { showSnackBar } = useSnackBar()
   const [expanded, setExpanded] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleExpandClick = () => {
     setExpanded(!expanded)
   }
 
   const onSubmit: SubmitHandler<User> = async (data) => {
+    setIsSubmitting(true)
     try {
       await authService.register(data)
       showSnackBar('Registration successful.', 'success')
       navigate('/login')
     } catch (error) {
-      let msg
       if (
         error instanceof AxiosError &&
         error.response &&
-        typeof error.response.data.detail == 'string'
-      )
-        msg = error.response.data.detail
-      else if (error instanceof Error) msg = error.message
-      else msg = String(error)
-      showSnackBar(msg, 'error')
+        error.response.status === 409 &&
+        typeof error.response.data.detail === 'string'
+      ) {
+        setError('email', {
+          type: 'manual',
+          message: '该邮箱已被注册',
+        })
+      } else if (
+        error instanceof AxiosError &&
+        error.response &&
+        typeof error.response.data.detail === 'string'
+      ) {
+        showSnackBar(error.response.data.detail, 'error')
+      } else if (error instanceof Error) {
+        showSnackBar(error.message, 'error')
+      } else {
+        showSnackBar(String(error), 'error')
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -115,7 +131,7 @@ export default function RegisterForm() {
                   label='Email Address'
                   autoComplete='email'
                   error={!!errors.email}
-                  helperText={errors.email && 'Please provide an email address.'}
+                  helperText={errors.email?.message || (errors.email && 'Please provide an email address.')}
                   {...register('email', { required: true })}
                 />
               </Grid>
@@ -133,8 +149,14 @@ export default function RegisterForm() {
                 />
               </Grid>
             </Grid>
-            <Button type='submit' fullWidth variant='contained' sx={{ mt: 3, mb: 2 }}>
-              Sign Up
+            <Button
+              type='submit'
+              fullWidth
+              variant='contained'
+              sx={{ mt: 3, mb: 2 }}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <CircularProgress size={20} /> : 'Sign Up'}
             </Button>
             <Grid container justifyContent='flex-end'>
               <Grid>

@@ -29,6 +29,11 @@ class UserService {
     return response.data
   }
 
+  async batchDeleteUsers(userIds: string[]): Promise<Array<User>> {
+    const response = await axios.post(API_URL + 'users/batch-delete', userIds)
+    return response.data
+  }
+
   async deleteSelf() {
     const response = await axios.delete(API_URL + 'users/me')
     return response.data
