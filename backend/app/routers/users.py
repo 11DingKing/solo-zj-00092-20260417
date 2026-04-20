@@ -97,6 +97,30 @@ async def delete_me(user: models.User = Depends(get_current_active_user)):
     return user
 
 
+@router.post("/batch-delete", response_model=list[schemas.User])
+async def batch_delete_users(
+    user_ids: list[UUID] = Body(...),
+    admin_user: models.User = Depends(get_current_active_superuser),
+):
+    """
+    Batch delete multiple users.
+
+    ** Restricted to superuser **
+
+    Parameters
+    ----------
+    user_ids : list[UUID]
+        List of user UUIDs to delete
+    """
+    deleted_users: list[models.User] = []
+    for user_id in user_ids:
+        user = await models.User.find_one({"uuid": user_id})
+        if user is not None:
+            await user.delete()
+            deleted_users.append(user)
+    return deleted_users
+
+
 @router.patch("/{userid}", response_model=schemas.User)
 async def update_user(
     userid: UUID,
@@ -140,7 +164,7 @@ async def update_user(
 
 @router.get("/{userid}", response_model=schemas.User)
 async def get_user(
-    userid: UUID, admin_user: models.User = Depends(get_current_active_superuser)
+    userid: UUID, admin_user: models.User = Depends(get_current_active_superuser),
 ):
     """
     Get User Info
@@ -165,34 +189,10 @@ async def get_user(
 
 @router.delete("/{userid}", response_model=schemas.User)
 async def delete_user(
-    userid: UUID, admin_user: models.User = Depends(get_current_active_superuser)
+    userid: UUID, admin_user: models.User = Depends(get_current_active_superuser),
 ):
     user = await models.User.find_one({"uuid": userid})
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     await user.delete()
     return user
-
-
-@router.post("/batch-delete", response_model=list[schemas.User])
-async def batch_delete_users(
-    user_ids: list[UUID] = Body(...),
-    admin_user: models.User = Depends(get_current_active_superuser),
-):
-    """
-    Batch delete multiple users.
-
-    ** Restricted to superuser **
-
-    Parameters
-    ----------
-    user_ids : list[UUID]
-        List of user UUIDs to delete
-    """
-    deleted_users: list[models.User] = []
-    for user_id in user_ids:
-        user = await models.User.find_one({"uuid": user_id})
-        if user is not None:
-            await user.delete()
-            deleted_users.append(user)
-    return deleted_users
