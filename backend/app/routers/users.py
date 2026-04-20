@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 from uuid import UUID
 
 from beanie.exceptions import RevisionIdWasChanged
@@ -174,9 +174,9 @@ async def delete_user(
     return user
 
 
-@router.post("/batch-delete", response_model=List[schemas.User])
+@router.post("/batch-delete", response_model=list[schemas.User])
 async def batch_delete_users(
-    user_ids: List[UUID] = Body(...),
+    user_ids: list[UUID] = Body(...),
     admin_user: models.User = Depends(get_current_active_superuser),
 ):
     """
@@ -186,10 +186,10 @@ async def batch_delete_users(
 
     Parameters
     ----------
-    user_ids : List[UUID]
+    user_ids : list[UUID]
         List of user UUIDs to delete
     """
-    deleted_users: List[models.User] = []
+    deleted_users: list[models.User] = []
     for user_id in user_ids:
         user = await models.User.find_one({"uuid": user_id})
         if user is not None:
